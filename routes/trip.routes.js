@@ -65,7 +65,6 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-
 // GET /trips/stats
 router.get('/stats', authMiddleware, async (req, res) => {
   try {
@@ -75,17 +74,27 @@ router.get('/stats', authMiddleware, async (req, res) => {
       match.driverId = new mongoose.Types.ObjectId(req.user.id);
     }
 
-    // Fetch trips
+    // Month filter
+    const { month } = req.query; // "YYYY-MM"
+    if (month) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+
+      match.startDate = { $gte: start, $lt: end };
+    }
+
+    // Fetch trips in the month
     const trips = await Trip.find(match);
 
-    // Fetch maintenance linked to driver (if role=driver)
+    // Maintenance for this driver (or all if admin)
     let maintenanceMatch = {};
     if (req.user.role === 'driver') {
       maintenanceMatch.driver = new mongoose.Types.ObjectId(req.user.id);
     }
     const maintenances = await mongoose.model("Maintenance").find(maintenanceMatch);
 
-    // Fetch ads (right now, assuming ads are company-wide, not per driver)
+    // Ads (company-wide)
     const ads = await mongoose.model("Ad").find({});
 
     // Aggregate totals
@@ -97,7 +106,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
     trips.forEach(trip => {
       const tripAmt = Number(trip.tripAmount || 0);
 
-      // Fuel
+      // Fuel parsing
       let fuel = 0;
       if (trip.fuelAmount) {
         if (!isNaN(Number(trip.fuelAmount))) {
@@ -116,15 +125,11 @@ router.get('/stats', authMiddleware, async (req, res) => {
       totalProfit += profit;
     });
 
-    // Add maintenance expenses
+    // Add maintenance and ads
     const totalMaintenance = maintenances.reduce((sum, m) => sum + Number(m.maintenanceCost || 0), 0);
-    totalExpenses += totalMaintenance;
-
-    // Add ad expenses
     const totalAds = ads.reduce((sum, ad) => sum + Number(ad.amount || 0), 0);
-    totalExpenses += totalAds;
 
-    // Recalculate profit
+    totalExpenses += totalMaintenance + totalAds;
     totalProfit = totalTripAmount - totalExpenses;
 
     res.json({
