@@ -251,12 +251,24 @@ router.post('/:id/restore', authMiddleware, async (req, res) => {
   }
 });
 
+
 router.get('/:id/whatsapp', authMiddleware, adminOnly, async (req, res) => {
   try {
     const trip = await Trip.findById(req.params.id);
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
     const { sendTo } = req.query; // "customer" or "driver"
+    const pickupDate = trip.startDate
+  ? new Date(trip.startDate).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+  : '-';
+
 
     let phone = '';
     if (sendTo === 'customer') {
@@ -271,7 +283,8 @@ router.get('/:id/whatsapp', authMiddleware, adminOnly, async (req, res) => {
 
     const message = `
 Trip details
-Pick-up Date: ${trip.startDate || '-'}
+Booking Number: ${trip.bookingId || '-'}
+Pick-up Date: ${pickupDate}
 From: ${trip.fromLocation || '-'}
 To: ${trip.endLocation || '-'}
 Cost: ₹${trip.tripAmount || '-'}
@@ -282,7 +295,6 @@ Phone number: ${trip.driverNumber || '-'}
 Vehicle: ${trip.vehicleType || '-'}
 Seating capacity: -
 Mode of Payment: ${trip.paymentMode || '-'}
-Booking Number: ${trip.bookingId || '-'}
     `;
 
     const encodedMessage = encodeURIComponent(message);
