@@ -260,6 +260,7 @@ router.get('/:id/whatsapp', authMiddleware, adminOnly, async (req, res) => {
     const { sendTo } = req.query; // "customer" or "driver"
     const pickupDate = trip.startDate
   ? new Date(trip.startDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: 'short',
       year: 'numeric',
